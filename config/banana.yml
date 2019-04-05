@@ -1,0 +1,7 @@
+banana:
+  database:
+    url: "sqlite:///banana1.db"
+    verbose: true
+  matcher:
+    minimal_treshold: 90
+    skip_filetype_check: true
