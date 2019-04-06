@@ -12,11 +12,10 @@ import filetype
 
 class FileSystemMediaScanner(object):
     """
-    Unfortunately we cannot easily create and rx Observable class, yet we would like to keep some state with it.
-    Using simple functional generator here is very inconvenient. So we basically are creating a callable here, which
-    then should be translated into rx.Observable with Observable.create factory method.
+    A callable here, which is transformed to rx.Observable with Observable.create factory method.
 
-    This class basically scans a given directory and feeds Observers with parsed media files.
+    This class scans a given directory for media to match and feeds Observers with parsed media files. Observers are
+    responsible for an actual match.
 
     It has an unique ID for every running scanner job.
     """
@@ -34,64 +33,64 @@ class FileSystemMediaScanner(object):
         self.skip_filetype_checks = skip_filetype_checks
         self.media_parser = MediaParser()
 
-
     def media_items_to_scan(self) -> int:
         return self._total_items
 
-    def __iter__(self):
+    def __call__(self, observer: rx.Observer):
 
         def is_supported_filetype(path, file):
+            # noinspection PyBroadException
             try:
                 f = os.path.join(path, file)
-                self.logger.debug("Checking if {} is supported by this scanner...".format(f))
+                self.logger.debug(f"Checking if {f} is supported by this scanner...")
                 return filetype.video(f) is not None
             except:
                 return False
 
-        self.logger.info("Starting scan job: {} for a folder: {}".format(self._job_context.id(), self._media_scan_path))
+        self.logger.info(f"Starting scan job: {self._job_context.id()} for a folder: {self._media_scan_path}")
 
         for current_dir_name, subdirectories, files in self._media_source:
             for f in files:
 
                 media = self.media_parser.parse(f)
 
+                # noinspection PyBroadException
                 try:
                     if not self.skip_filetype_checks and \
                             not is_supported_filetype(current_dir_name, f):
-                        self.logger.info('File {} is not supported by this scanner. Skipping.'.format(f))
+                        self.logger.info(f'File {f} is not supported by this scanner. Skipping.')
                     else:
-                        self.logger.debug("Processing {}...".format(f))
-                        parsed_media_item = ParsedMediaItem(filename=f,
-                                                            path=current_dir_name,
-                                                            audio=media.get("audio"),
-                                                            codec=media.get("codec"),
-                                                            container=media.get("container"),
-                                                            episode=media.get("episode"),
-                                                            episodeName=media.get("episodeName"),
-                                                            garbage=media.get("garbage"),
-                                                            group=media.get("group"),
-                                                            hardcoded=media.get("hardcoded"),
-                                                            language=media.get("language"),
-                                                            proper=media.get("proper"),
-                                                            quality=media.get("quality"),
-                                                            region=media.get("region"),
-                                                            repack=media.get("repack"),
-                                                            resolution=media.get("resolution"),
-                                                            season=media.get("season"),
-                                                            title=media.get("title"),
-                                                            website=media.get("website"),
-                                                            widescreen=media.get("widescreen"),
-                                                            year=media.get("year"))
+                        self.logger.debug(f"Processing {f}...")
+                        media = ParsedMediaItem(filename=f,
+                                                path=current_dir_name,
+                                                audio=media.get("audio"),
+                                                codec=media.get("codec"),
+                                                container=media.get("container"),
+                                                episode=media.get("episode"),
+                                                episodeName=media.get("episodeName"),
+                                                garbage=media.get("garbage"),
+                                                group=media.get("group"),
+                                                hardcoded=media.get("hardcoded"),
+                                                language=media.get("language"),
+                                                proper=media.get("proper"),
+                                                quality=media.get("quality"),
+                                                region=media.get("region"),
+                                                repack=media.get("repack"),
+                                                resolution=media.get("resolution"),
+                                                season=media.get("season"),
+                                                title=media.get("title"),
+                                                website=media.get("website"),
+                                                widescreen=media.get("widescreen"),
+                                                year=media.get("year"))
 
-                        yield parsed_media_item
+                        observer.on_next(media)
 
                 except BaseException as e:
                     self.logger("FileSystemMediaScanner caught exception", traceback.format_exc())
+                    observer.on_error(e)
 
-
-        self.logger.info("Completed file scan job: {} for a folder {}".format(self._job_context.id(),
-                                                                              self._media_scan_path))
-        #raise StopIteration
+        self.logger.info(f"Completed file scan job: {self._job_context.id()} for a folder {self._media_scan_path}")
+        observer.on_completed()
 
 
 class MediaScanJob(JobContext, Runnable):

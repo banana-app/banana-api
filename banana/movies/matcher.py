@@ -1,6 +1,7 @@
 from fuzzywuzzy import fuzz
 from typing import List
 from abc import ABC, abstractmethod
+import traceback
 
 from ..movies.model import MovieMatchCandidate
 from ..media.item import ParsedMediaItem
@@ -206,7 +207,13 @@ def _top5_matches(parsed_media_item, match_source):
     """
     logger.info("Matching {}".format(parsed_media_item))
 
-    match_candidates = match_source.match(title=parsed_media_item.title)
+    match_candidates = []
+
+    try:
+        match_candidates = match_source.match(title=parsed_media_item.title)
+    except BaseException:
+        logger.warn(f"Exception caught while matching {parsed_media_item} with the source: {traceback.format_exc()}. "
+                    f"Skipped for this source.")
 
     canonical_title = canonical_movie_title(parsed_media_item.title, parsed_media_item.year).lower()
 

@@ -74,7 +74,6 @@ class ScannerTest(unittest.TestCase):
         self.assertIsNotNone(filetype.video(os.path.join(self.temp_dir, self._files[1])))
 
 
-
     def test_threadpool_executor(self):
 
         with open(os.path.join(self.temp_dir, self._files[1]), 'wb') as qoox:

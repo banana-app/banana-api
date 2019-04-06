@@ -10,6 +10,13 @@ from banana.movies.model import MovieMatchRequest
 
 class ManualMatchingObservable:
     """
+    This observable handles manual match request from UI (meaning that user manually chooses a movie candidate to match
+    with unmatched media. MovieMatchRequest input carries all required information:
+
+    * a MatchSource (either user decides to match media against tmdb, imdb or already existing (local) movie match
+     candidate.
+    * a source specific ID: tmdb id if source is 'tmdb', imdb id is source is 'imdb' or UnmatchedItem id is source is
+    'local'
     """
 
     def __init__(self,
@@ -23,6 +30,10 @@ class ManualMatchingObservable:
         self._get_media_source = source_factory
 
     def __call__(self, observer: rx.Observer):
+        """
+        It emits an event to the observers with UnmatchedItem and movie match candidate to match with that item.
+        :param observer - an Observer to handle actual match.
+        """
         try:
             if any(_ == self._match_request.match_type, ['imdb', 'tmdb', 'local']):
                 unmatched = UnmatchedItem.query.filter_by(id=self._match_request.unmatched_item_id).one_or_none()
@@ -33,7 +44,7 @@ class ManualMatchingObservable:
                 observer.on_completed()
 
             else:
-                observer.on_error('Unknown match request type: {}'.format(self._match_request))
+                observer.on_error(f'Unknown match request type: {self._match_request}')
 
         except BaseException as e:
             observer.on_error(e)

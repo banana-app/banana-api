@@ -2,6 +2,7 @@ import json
 
 from flask import request, Response
 from sqlalchemy.orm import joinedload
+from sqlalchemy import or_
 
 from banana.common.json import _DateAwareJsonEncoder
 from banana.core import app
@@ -57,7 +58,16 @@ def movies():
 
 
 def local_search(title):
-    movies = Movie.query.filter(Movie.title.like("%" + title + "%")).limit(10)
+
+    total_results = Movie.query.filter(or_(
+        Movie.title.like(f'%{title}%'),
+        Movie.original_title.like(f'%{title}%')
+    )).count()
+
+    movies = Movie.query.filter(or_(
+        Movie.title.like(f'%{title}%'),
+        Movie.original_title.like(f'%{title}%')
+    )).limit(3)
 
     results = []
     for m in movies:
@@ -71,7 +81,14 @@ def local_search(title):
             "source": "local"
         })
 
-    return results
+    return total_results, results
+
+
+@app.route("/api/movies/search/local", methods=["GET"])
+def movies_search_local():
+    total_results, results = local_search(request.args.get('title'))
+
+    return json.dumps({'total_results': total_results, 'results': results}, cls=_DateAwareJsonEncoder)
 
 
 @app.route("/api/movies/search", methods=["GET"])
@@ -83,7 +100,7 @@ def movies_search():
     results = []
 
     if source == "local":
-        results = local_search(title=title)
+        _, results = local_search(title=title)
     else:
         results = get_media_source(source).search(title=title)
         if for_item:

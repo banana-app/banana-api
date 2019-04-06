@@ -6,12 +6,12 @@
   "SQLALCHEMY_ECHO": true,
   "SQLALCHEMY_TRACK_MODIFICATIONS": false,
 
-  "BANANA_MEDIA_SCANNER_SKIP_FILETYPE_CHECKS": false,
+  "BANANA_MEDIA_SCANNER_SKIP_FILETYPE_CHECKS": true,
   "BANANA_MATCHER_THRESHOLD": 90,
   "BANANA_MEDIA_MOVIE_PATTERN_NAME": "{{media_movies_target_path}}/{{movie.canonical_title()}}/{{movie.canonical_title()}}{%if file.quality is not none%} - {{file.quality}}{%endif%}{%if file.resolution is not none%} - {{file.resolution}}{%endif%}.{{file.container}}",
   "BANANA_MEDIA_MOVIES_TARGET_PATH": "d:\\work\\movies",
   "BANANA_MEDIA_TARGET": "noop",
   "BANANA_MEDIA_TARGET_RESOLVER": "skip_existing",
   "BANANA_MEDIA_MATCHER": "low_threshold_fallback",
-  "BANANA_MEDIA_SCAN_PATH": "z:\\box\\downloads\\completed\\"
+  "BANANA_MEDIA_SCAN_PATH": "d:\\work\\tmp\\"
 }

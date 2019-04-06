@@ -34,7 +34,7 @@ class FileSystemScanJob(JobContext, Runnable):
     def run(self, scheduler):
         scanner = FileSystemMediaScanner(self)
         media_items_to_scan = scanner.media_items_to_scan()
-        scanner_observable = rx.Observable.from_(scanner, scheduler).zip(rx.Observable.
+        scanner_observable = rx.Observable.create(scanner).zip(rx.Observable.
                                                     from_iterable(range(media_items_to_scan), scheduler), lambda x, y: (y+1, x))
         subject = rx.subjects.Subject()
         subject.subscribe(MediaItemMatchingObserver(self))

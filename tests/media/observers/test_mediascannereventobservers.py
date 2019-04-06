@@ -22,11 +22,10 @@ class MediaScannerEventObserversTest(unittest.TestCase):
     def test_emit_progress_events(self):
         scanner = FileSystemMediaScanner(media_scan_path=self.temp_dir,
                                          job_context=self.job_context, skip_filetype_checks=True)
-        scanner_observer = rx.Observable.from_(scanner)
+        scanner_observer = rx.Observable.create(scanner)
 
         sock = MockWebSocket()
         sock.emit = MagicMock()
-
         event = JobProgressEvent(job_id=self.job_context.id(),
                                  job_type=self.job_context.type(),
                                  current_item=2,

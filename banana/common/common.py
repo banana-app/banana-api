@@ -1,8 +1,7 @@
-from datetime import datetime
-import unidecode
-
 import logging
+
 import math
+import unidecode
 
 logger = logging.getLogger(__name__)
 

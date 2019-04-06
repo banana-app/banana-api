@@ -1,3 +1,4 @@
+pysqlite3
 cachetools==3.1.0
 dataclasses-json==0.2.2
 filetype==1.0.5
@@ -6,6 +7,7 @@ Flask-SocketIO==3.3.2
 Flask-SQLAlchemy==2.3.2
 funcy==1.11
 fuzzywuzzy==0.17.0
+python-Levenshtein
 gevent==1.4.0
 gevent-websocket==0.10.1
 IMDbPY==6.6

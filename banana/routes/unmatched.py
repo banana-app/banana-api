@@ -16,16 +16,10 @@ def media_searchbla():
     title = request.args.get("term")
 
     results = []
-    media = ParsedMediaItem.query.filter(ParsedMediaItem.filename.like("%" + title + "%")).limit(5)
+    total_results = ParsedMediaItem.query.filter(ParsedMediaItem.filename.like("%" + title + "%")).count()
+    media = ParsedMediaItem.query.filter(ParsedMediaItem.filename.like("%" + title + "%")).limit(3).all()
 
-    results = []
-    for m in media:
-        results.append({
-            "filename": m.filename,
-            "id": m.id,
-            "matched_to": m.matched_movie_id
-        })
-    return json.dumps(results, cls=_DateAwareJsonEncoder)
+    return json.dumps({'total_results': total_results, 'results': media}, cls=_DateAwareJsonEncoder)
 
 
 @app.route("/api/unmatched", methods=["GET"])
