@@ -1,14 +1,11 @@
-import rx
-from enum import Enum
-
-from banana.events import JobProgressEvent, JobCompletedEvent, JobErrorEvent
-from banana.core.jobs import JobContext
-from banana.core import socket as web_socket, getLogger
 from typing import Tuple
 
+import rx
+
+from banana.core import socket as web_socket, getLogger
+from banana.core.jobs import JobContext
+from banana.events import JobProgressEvent, JobCompletedEvent, JobErrorEvent
 from banana.media.item import ParsedMediaItem
-from banana.media.model import UnmatchedItem
-from banana.movies.model import MovieMatchCandidate
 
 JOB_NAMESPACE = '/jobs'
 
@@ -117,6 +114,59 @@ class ManualMatchCompletedOrErrorEventObserver(EmitEventMixin, rx.Observer):
 
 # noinspection PyBroadException
 class ManualMatchProgressEventObserver(EmitEventMixin, rx.Observer):
+
+    def __init__(self, job_context: JobContext, socket=web_socket):
+        super().__init__()
+        self._job_context = job_context
+        self._socket = socket
+        self.logger = getLogger(self.__class__.__name__)
+
+    def on_next(self, value):
+        try:
+            self.emit(self._socket,
+                      JobProgressEvent(job_id=self._job_context.id(), job_type=self._job_context.type())
+                      )
+        except BaseException as e:
+            self.logger.warning("Exception caught while emitting JobProgressEvent: {}".format(e))
+
+    def on_error(self, error):
+        pass
+
+    def on_completed(self):
+        pass
+
+
+class FixMatchCompletedOrErrorEventObserver(EmitEventMixin, rx.Observer):
+
+    def __init__(self, job_context: JobContext, socket=web_socket):
+        super().__init__()
+        self._job_context = job_context
+        self._socket = socket
+        self.logger = getLogger(self.__class__.__name__)
+
+    def on_next(self, value):
+        pass
+
+    def on_completed(self):
+        try:
+            self.emit(self._socket,
+                      JobCompletedEvent(job_id=self._job_context.id(), job_type=self._job_context.type())
+                      )
+
+        except BaseException as e:
+            self.logger.warning("Exception caught while emitting JobCompletedEvent: {}".format(e))
+
+    def on_error(self, error):
+        try:
+            self.emit(self._socket,
+                      JobErrorEvent(job_id=self._job_context.id(), job_type=self._job_context.type())
+                      )
+        except BaseException as e:
+            self.logger.warning("Exception caught while emitting JobErrorEvent: {}".format(e))
+
+
+# noinspection PyBroadException
+class FixMatchProgressEventObserver(EmitEventMixin, rx.Observer):
 
     def __init__(self, job_context: JobContext, socket=web_socket):
         super().__init__()

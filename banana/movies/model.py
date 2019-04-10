@@ -20,7 +20,7 @@ class MovieMatchRequest(object):
     * imdb - match based on IMDB id; match_type_id is IMDB id in this case
     * tmdb - match based on TMDB id; match_type_id is TMDB id in this case
     * local - match against pre-exsiting match candidates, match_type_id is local MovieMatchCandidate id
-    * custom - complete custom match - in this case cutom_name and custom_year is required
+    * custom - custom match - cutom_name and custom_year is required
     """
     unmatched_item_id: int = None
     # local|tmdb|imdb|cutom

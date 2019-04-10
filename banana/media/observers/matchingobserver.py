@@ -2,6 +2,8 @@ import traceback
 from typing import Tuple
 
 import rx
+from funcy import none
+from whatever import _
 
 from banana.core import Config, socket as web_socket
 from banana.core import db, getLogger
@@ -13,7 +15,7 @@ from banana.media.targets import get_media_target_resolver, MediaTargetResolver
 from banana.movies.commands import match_movie
 from banana.movies.matchdecider import MatchType, MatchDecider
 from banana.movies.matcher import get_matcher, Matcher
-from banana.movies.model import MovieMatchCandidate
+from banana.movies.model import MovieMatchCandidate, Movie
 
 
 class MediaItemMatchingObserver(rx.Observer):
@@ -108,6 +110,65 @@ class ManualMediaItemMatchingObserver(EmitEventMixin, rx.Observer):
             match_movie(media=target_media, movie=movie, target=target)
 
             db.session.delete(unmatched)
+            db.session.commit()
+
+        except BaseException as e:
+            self.logger.warning("Exception caught while processing media item: {}. Emitting JobErrorEvent and"
+                                " unwinding gracefully. This media item would not be processed."
+                                .format(traceback.format_exc()))
+            db.session.rollback()
+
+            # We need to handle this gracefully. Exceptions emitted from Observers means that Observable will
+            # unsubscribe all of them, and in fact this will be rethrown. We want, however to emit proper
+            # event to UI first, the we rethrow to finish job
+
+            self.emit(self._web_socket, JobErrorEvent(job_id=self._job_context.id(),
+                                                      job_type=self._job_context.type(),
+                                                      cause=str(e)))
+            raise e
+
+    def on_completed(self):
+        pass
+
+    def on_error(self, error):
+        self.logger.warning('ManualMediaItemMatchingObserver on_error: {}'.format(error))
+
+
+class FixMatchObserver(EmitEventMixin, rx.Observer):
+
+    def __init__(self,
+                 job_context: JobContext,
+                 resolver: MediaTargetResolver = get_media_target_resolver(Config.media_target_resolver()),
+                 web_socket = web_socket):
+        super().__init__()
+        self._job_context = job_context
+        self._web_socket = web_socket
+        self.resolver = resolver
+        self.logger = getLogger(self.__class__.__name__)
+
+    def on_next(self, media_and_candidate: Tuple[ParsedMediaItem, MovieMatchCandidate]):
+        # noinspection PyBroadException
+        try:
+            source_media, candidate = media_and_candidate
+            movie = candidate.to_movie()
+            target_media, target = self.resolver.resolve(media=source_media.transient_copy(), movie=movie)
+
+            already_existing_movie = Movie.query.filter_by(external_id=movie.external_id).first()
+            if not already_existing_movie:
+                movie.media_items = [target_media]
+                db.session.add(movie)
+            else:
+                already_existing_movie.media_items += [target_media]
+
+            target.do_relink(source_media.absolute_target_path())
+            source_movie = source_media.matched_movie
+
+            # if we are unlinking the only linke media from movie, we remove whole
+            # movie altogether
+            if source_movie and none(_.id != source_media.id, source_movie.media_items):
+                db.session.delete(source_movie)
+
+            db.session.delete(source_media)
             db.session.commit()
 
         except BaseException as e:

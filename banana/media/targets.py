@@ -1,9 +1,11 @@
-from abc import ABC, abstractmethod
 import os
+from abc import ABC, abstractmethod
+from pathlib import Path
+
+from banana.core import Config, getLogger
 from banana.media.item import ParsedMediaItem
 from banana.media.nameformatter import NameFormatter
 from banana.movies.model import Movie
-from banana.core import Config, getLogger
 
 logger = getLogger(__name__)
 
@@ -25,6 +27,10 @@ class MediaTarget(ABC):
         :param source: a source media item
         :param target: a target
         """
+        pass
+
+    @abstractmethod
+    def do_relink(self, from_path: str):
         pass
 
     def already_exist(self) -> bool:
@@ -83,9 +89,12 @@ class SkipExistingMediaTargetResolver(MediaTargetResolver):
                     return True
 
                 def do_link(self):
-                    raise NotImplementedError('This is a DoNotTouchMediaTarget. Target media {} already '
-                                              'exist and cannot be linked to {}'.format(target_absolute_path,
-                                                                                        media.absolute_path()))
+                    raise NotImplementedError(f'This is a DoNotTouchMediaTarget. Target media {target_absolute_path} '
+                                              f'already exist and cannot be linked to {media.absolute_path()}')
+
+                def do_relink(self, from_path: str):
+                    raise NotImplementedError(f'This is a DoNotTouchMediaTarget. Target media {target_absolute_path} '
+                                              f'already exist and cannot be linked to {media.absolute_path()}')
 
             return media, DoNotTouchMediaTarget()
         else:
@@ -110,6 +119,11 @@ class NoOpMediaTargetBuilder(MediaTargetBuilder):
             def do_link(self):
                 logger.info("**Dry Run** Just logging information. Linking {} to {}".format(
                     self._media.absolute_path(),
+                    self._formatter.format(self._movie, self._media)))
+
+            def do_relink(self, from_path: str):
+                logger.info("**Dry Run** Just logging information. Relinking {} to {}".format(
+                    from_path,
                     self._formatter.format(self._movie, self._media)))
 
             def already_exist(self) -> bool:
@@ -141,10 +155,31 @@ class HardLinkMediaTargetBuilder(MediaTargetBuilder):
                 """
                 source = self._media.absolute_path()
                 target = self._formatter.format(self._movie, self._media)
-                logger.info("Creating hard link from {} to {}".format(source, target))
+                logger.info(f"Creating hard link from {source} to {target}")
                 target_dirname = os.path.dirname(target)
                 os.makedirs(target_dirname, exist_ok=True)
                 os.link(source, target)
+
+            def do_relink(self, from_file: str):
+                """
+                Media Target strategy that re-links (hard link on Unices and JointPoint on Windows). We assume that in
+                this case, both source and from_path are path-like structures.
+
+                For re-link new file is linked to the target, and then whole old directory is removed.
+
+                :param source: source media file
+                :from_path: a pathto the previous target (a whole directory)
+                :param target: a hard link name
+                """
+                source = self._media.absolute_path()
+                target = self._formatter.format(self._movie, self._media)
+                logger.info(f"Creating hard link from {source} to {target}")
+                target_dirname = os.path.dirname(target)
+                os.makedirs(target_dirname, exist_ok=True)
+                os.link(source, target)
+                if Path(from_file).exists():
+                    logger.info(f"Removing unlinked media {from_file}")
+                    os.unlink(from_file)
 
             def already_exist(self) -> bool:
                 """
