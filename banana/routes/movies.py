@@ -1,11 +1,11 @@
 import json
 
-from flask import request, Response
+from flask import request
 from sqlalchemy.orm import joinedload
-from sqlalchemy import or_
 
 from banana.common.json import _DateAwareJsonEncoder
 from banana.core import app
+from banana.media.item import ParsedMediaItem
 from banana.media.jobs import ManualMovieMatchJob
 from ..common.common import total_pages
 from ..core import getLogger, ThreadPoolJobExecutor
@@ -21,10 +21,10 @@ items_per_page = 5
 @app.route("/api/movies", methods=["POST"])
 def movies_match():
     logger.info("Matching request: {}".format(request.data))
-
     match_request = MovieMatchRequest.from_json(request.data)
-    ThreadPoolJobExecutor().submit(ManualMovieMatchJob(match_request=match_request))
-    return Response(status=202)
+    match_job = ManualMovieMatchJob(match_request=match_request)
+    ThreadPoolJobExecutor().submit(match_job)
+    return json.dumps({'job_id': match_job.id()})
 
 
 @app.route("/api/movies/<int:movie_id>")
@@ -38,9 +38,17 @@ def movies():
     page = request.args.get("page")
     order_by=request.args.get("order_by")
     order_direction=request.args.get("order_direction")
+    job_id=request.args.get("job_id")
+
     if not page:
-        total = Movie.query.count()
-        items = Movie.query.options(joinedload('*')).all()
+        query = Movie.query.options(joinedload('*'))
+
+        if job_id is not None:
+            query = query.join(ParsedMediaItem).filter(ParsedMediaItem.job_id == job_id)
+
+        total = query.count()
+        items = query.all()
+
         return json.dumps({"total_items": total,
                            "pages": total_pages(len(items), items_per_page),
                            "items": items}, cls=_DateAwareJsonEncoder)
@@ -49,66 +57,19 @@ def movies():
             int_page = int(page)
         except ValueError:
             raise ValueError("Invalid value for 'page' query parameter: {}. Should be an integer value.".format(page))
+
         query = Movie.query.options(joinedload("*"))
+
+        if job_id is not None:
+            query = query.join(ParsedMediaItem).filter(ParsedMediaItem.job_id == job_id)
+
         if order_by is not None and order_direction is not None:
-            query = query.order_by("{} {}".format(order_by, order_direction))
+            query = query.order_by(f"{order_by} {order_direction}")
+
         results = query.paginate(int_page, items_per_page, False)
+
         return json.dumps({"total_items": results.total, "pages": total_pages(results.total, items_per_page),
                            "items": results.items}, cls=_DateAwareJsonEncoder)
-
-
-def local_search(title):
-
-    total_results = Movie.query.filter(or_(
-        Movie.title.like(f'%{title}%'),
-        Movie.original_title.like(f'%{title}%')
-    )).count()
-
-    movies = Movie.query.filter(or_(
-        Movie.title.like(f'%{title}%'),
-        Movie.original_title.like(f'%{title}%')
-    )).limit(3)
-
-    results = []
-    for m in movies:
-        results.append({
-            "title": m.title,
-            "original_title": m.original_title,
-            "poster": m.poster,
-            "plot": m.plot,
-            "release_year": m.release_year,
-            "source_id": m.id,
-            "source": "local"
-        })
-
-    return total_results, results
-
-
-@app.route("/api/movies/search/local", methods=["GET"])
-def movies_search_local():
-    total_results, results = local_search(request.args.get('title'))
-
-    return json.dumps({'total_results': total_results, 'results': results}, cls=_DateAwareJsonEncoder)
-
-
-@app.route("/api/movies/search", methods=["GET"])
-def movies_search():
-    title = request.args.get("title")
-    for_item = request.args.get("for_item")
-    source = request.args.get("source", "tmdb")
-
-    results = []
-
-    if source == "local":
-        _, results = local_search(title=title)
-    else:
-        results = get_media_source(source).search(title=title)
-        if for_item:
-            for r in results:
-                r["unmatched_item_id"] = for_item
-
-    logger.debug(results)
-    return json.dumps(results, cls=_DateAwareJsonEncoder)
 
 
 @app.route("/api/movies/count")

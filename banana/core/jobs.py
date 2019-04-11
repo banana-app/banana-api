@@ -21,11 +21,11 @@ class JobExecutor(ABC):
 class JobContext(ABC):
 
     @abstractmethod
-    def type(self):
+    def type(self) -> str:
         pass
 
     @abstractmethod
-    def id(self):
+    def id(self) -> str:
         pass
 
 

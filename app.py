@@ -6,6 +6,7 @@ from banana.events import JobCompletedEvent
 from banana.routes.movies import *
 from banana.routes.unmatched import *
 from banana.routes.media import *
+from banana.routes.sources import *
 
 from banana.core import app, db, socket, getLogger
 

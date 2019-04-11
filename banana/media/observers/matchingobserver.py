@@ -38,6 +38,7 @@ class MediaItemMatchingObserver(rx.Observer):
 
             # check if this item is not yet matched
             _, media = index_and_media
+            media.job_id = self._job_context.id()
 
             if not media.is_movie():
                 self.logger.info("{} not a movie. Skipping.".format(media.filename))
@@ -104,6 +105,7 @@ class ManualMediaItemMatchingObserver(EmitEventMixin, rx.Observer):
         try:
             unmatched, candidate = media_and_movie
             media = unmatched.parsed_media_item.transient_copy()
+            media.job_id = self._job_context.id()
             movie = candidate.to_movie()
             target_media, target = self.resolver.resolve(media=media, movie=movie)
 
@@ -150,6 +152,7 @@ class FixMatchObserver(EmitEventMixin, rx.Observer):
         # noinspection PyBroadException
         try:
             source_media, candidate = media_and_candidate
+            source_media.job_id = self._job_context.id()
             movie = candidate.to_movie()
             target_media, target = self.resolver.resolve(media=source_media.transient_copy(), movie=movie)
 

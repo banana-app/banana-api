@@ -23,5 +23,6 @@ def update_media(media_id: int):
     logger.info("Fix match request: {}".format(request.data))
 
     match_request = MovieMatchRequest.from_json(request.data)
-    ThreadPoolJobExecutor().submit(FixMatchJob(match_request=match_request, media_id=media_id))
-    return Response(status=202)
+    fix_match_job = FixMatchJob(match_request=match_request, media_id=media_id)
+    ThreadPoolJobExecutor().submit(fix_match_job)
+    return json.dumps({'job_id': fix_match_job.id()})

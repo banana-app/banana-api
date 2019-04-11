@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import imdb
 
 import banana.media.sources.imdbsuggestions as imdbsuggestions
@@ -158,11 +158,12 @@ class IMDBApi(object):
         return _imdb_to_match_candidate(movie)
 
     @staticmethod
-    def search(title):
+    def search(title) -> dict:
         # noinspection PyBroadException
         try:
             suggestions = imdbsuggestions.suggest_movie(title)
-            return [_imdb_suggestion_to_search_result(s) for s in suggestions]
+            return {'total_results': len(suggestions),
+                    'results': [_imdb_suggestion_to_search_result(s) for s in suggestions]}
         except BaseException:
-            return []
+            return {'total_results': 0, 'results': []}
 

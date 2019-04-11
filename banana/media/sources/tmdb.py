@@ -2,7 +2,7 @@ import tmdbsimple as tmdb
 import textwrap
 from datetime import datetime
 from banana.core import tbdb_api_key
-from typing import List
+from typing import List, Tuple
 from banana.movies.model import MovieMatchCandidate, Genre
 from cachetools.func import ttl_cache
 
@@ -131,9 +131,9 @@ class TMDBApi:
     # Returns possible match candidates for a movie; this is much slower than search, as it returns a richer
     # set of information
     @staticmethod
-    def search(title: str):
+    def search(title: str) -> dict:
         results = tmdb.Search().movie(query=title)['results']
-        return [TMDBApi._tmdb_to_movie_search_item(m) for m in results]
+        return {'total_results': len(results), 'results': [TMDBApi._tmdb_to_movie_search_item(m) for m in results]}
 
     @staticmethod
     def get_by_imdbid_id(imdbid) -> MovieMatchCandidate:

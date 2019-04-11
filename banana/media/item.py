@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from uuid import UUID
 
 from sqlalchemy import and_
 
@@ -34,6 +35,7 @@ class ParsedMediaItem(db.Model):
     website: str = db.Column(db.String)
     widescreen: str = db.Column(db.String)
     year: str = db.Column(db.String)
+    job_id: str = db.Column(db.String)
 
     unmatched_item_id: int = db.Column(db.Integer, db.ForeignKey('unmatched_item.id'),
                                        nullable=True)
@@ -69,7 +71,8 @@ class ParsedMediaItem(db.Model):
             title=self.title,
             website=self.website,
             widescreen=self.widescreen,
-            year=self.year)
+            year=self.year,
+            job_id=self.job_id)
 
     def already_matched(self):
         return ParsedMediaItem.query.filter(and_(
