@@ -89,12 +89,12 @@ class SkipExistingMediaTargetResolver(MediaTargetResolver):
                     return True
 
                 def do_link(self):
-                    raise NotImplementedError(f'This is a DoNotTouchMediaTarget. Target media {target_absolute_path} '
-                                              f'already exist and cannot be linked to {media.absolute_path()}')
+                    raise NotImplementedError(f'\'{os.path.basename(target_absolute_path)}\' already exists and cannot'
+                                              f' be linked to \'{media.filename}\'')
 
                 def do_relink(self, from_path: str):
-                    raise NotImplementedError(f'This is a DoNotTouchMediaTarget. Target media {target_absolute_path} '
-                                              f'already exist and cannot be linked to {media.absolute_path()}')
+                    raise NotImplementedError(f'\'{os.path.basename(target_absolute_path)}\' already exists and cannot'
+                                              f' be linked to \'{media.filename}\'')
 
             return media, DoNotTouchMediaTarget()
         else:

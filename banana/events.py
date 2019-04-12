@@ -30,7 +30,7 @@ class JobErrorEvent(object):
     event_type: str = EventTypes.ERROR
     current_item: int = None
     total_items: int = None
-    cause: str = None
+    context: str = None
 
 
 @dataclass
