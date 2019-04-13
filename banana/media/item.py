@@ -1,6 +1,6 @@
+import datetime
 import os
 from dataclasses import dataclass
-from uuid import UUID
 
 from sqlalchemy import and_
 
@@ -36,9 +36,10 @@ class ParsedMediaItem(db.Model):
     widescreen: str = db.Column(db.String)
     year: str = db.Column(db.String)
     job_id: str = db.Column(db.String)
+    created_datetime: datetime = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     unmatched_item_id: int = db.Column(db.Integer, db.ForeignKey('unmatched_item.id'),
-                                       nullable=True)
+                                           nullable=True)
 
     # reference to matched movie, if this media is already matched to a movie
     matched_movie_id: int = db.Column(db.Integer, db.ForeignKey('movie.id'),

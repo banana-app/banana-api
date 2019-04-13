@@ -5,6 +5,7 @@ from banana.movies.model import *
 from funcy import lmap
 from whatever import _
 
+
 class MovieModelsTest(unittest.TestCase):
 
     def test_genre_transient_copy(self):

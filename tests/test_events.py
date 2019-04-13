@@ -1,7 +1,8 @@
-import unittest
-from banana.events import *
-import uuid
 import json
+import unittest
+import uuid
+
+from banana.events import *
 
 
 class EventTests(unittest.TestCase):

@@ -68,8 +68,8 @@ class ManualMovieMatchJob(JobContext, Runnable):
     def run(self, scheduler):
         manual_matcher = rx.Observable.create(ManualMatchingObservable(self, self._match_request))
         subject = rx.subjects.Subject()
-        subject.subscribe(ManualMediaItemMatchingObserver(self))
         subject.subscribe(ManualMatchProgressEventObserver(self))
+        subject.subscribe(ManualMediaItemMatchingObserver(self))
         subject.subscribe(ManualMatchCompletedOrErrorEventObserver(self))
         manual_matcher.subscribe_on(scheduler).subscribe(subject)
 
@@ -83,7 +83,7 @@ class FixMatchJob(JobContext, Runnable):
                  ):
         self._id: str = str(uuid.uuid4())
         self._media_id = media_id
-        self._type: str = JobTypes.MANUAL_MATCH.value
+        self._type: str = JobTypes.FIX_MATCH.value
         self._match_request = match_request
         self._resolver = resolver
 
@@ -98,7 +98,7 @@ class FixMatchJob(JobContext, Runnable):
                                                                  match_request=self._match_request,
                                                                  media_id=self._media_id))
         subject = rx.subjects.Subject()
-        subject.subscribe(FixMatchObserver(self))
         subject.subscribe(FixMatchProgressEventObserver(self))
+        subject.subscribe(FixMatchObserver(self))
         subject.subscribe(FixMatchCompletedOrErrorEventObserver(self))
         manual_matcher.subscribe_on(scheduler).subscribe(subject)

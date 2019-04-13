@@ -1,7 +1,7 @@
 import json
 
 from flask import request
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, aliased
 
 from banana.common.json import _DateAwareJsonEncoder
 from banana.core import app
@@ -10,7 +10,7 @@ from banana.media.jobs import ManualMovieMatchJob
 from ..common.common import total_pages
 from ..core import getLogger, ThreadPoolJobExecutor
 from ..media.sources import get_media_source
-from ..movies.model import Movie, MovieMatchRequest
+from ..movies.model import Movie, MovieMatchRequest, Genre
 
 logger = getLogger(__name__)
 
@@ -33,15 +33,34 @@ def get_movie(movie_id):
     return json.dumps(movie, cls=_DateAwareJsonEncoder)
 
 
+def _order_by_builder(order_by, order_direction):
+    _mapping = {
+        'created_datetime': {
+            'desc': Movie.created_datetime.desc(),
+            'asc': Movie.created_datetime.asc()
+        },
+        'title': {
+            'desc': Movie.title.desc(),
+            'asc': Movie.title.asc()
+        }
+    }
+    return _mapping[order_by][order_direction]
+
+
 @app.route("/api/movies", methods=["GET"])
 def movies():
     page = request.args.get("page")
-    order_by=request.args.get("order_by")
-    order_direction=request.args.get("order_direction")
-    job_id=request.args.get("job_id")
+    page_size = request.args.get("page_size", 5)
+    order_by = request.args.get("order_by")
+    order_direction = request.args.get("order_direction")
+    job_id = request.args.get("job_id")
 
     if not page:
         query = Movie.query.options(joinedload('*'))
+
+        if order_by is not None and order_direction is not None:
+            order_clause = _order_by_builder(order_by, order_direction)
+            query = query.order_by(order_clause)
 
         if job_id is not None:
             query = query.join(ParsedMediaItem).filter(ParsedMediaItem.job_id == job_id)
@@ -58,15 +77,16 @@ def movies():
         except ValueError:
             raise ValueError("Invalid value for 'page' query parameter: {}. Should be an integer value.".format(page))
 
-        query = Movie.query.options(joinedload("*"))
+        query = Movie.query.options(joinedload('*'))
+
+        if order_by is not None and order_direction is not None:
+            order_clause = _order_by_builder(order_by, order_direction)
+            query = query.order_by(order_clause)
 
         if job_id is not None:
             query = query.join(ParsedMediaItem).filter(ParsedMediaItem.job_id == job_id)
 
-        if order_by is not None and order_direction is not None:
-            query = query.order_by(f"{order_by} {order_direction}")
-
-        results = query.paginate(int_page, items_per_page, False)
+        results = query.paginate(int_page, int(page_size), False)
 
         return json.dumps({"total_items": results.total, "pages": total_pages(results.total, items_per_page),
                            "items": results.items}, cls=_DateAwareJsonEncoder)
