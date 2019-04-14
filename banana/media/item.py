@@ -36,6 +36,8 @@ class ParsedMediaItem(db.Model):
     widescreen: str = db.Column(db.String)
     year: str = db.Column(db.String)
     job_id: str = db.Column(db.String)
+    ignored: bool = db.Column(db.Boolean)
+
     created_datetime: datetime = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     unmatched_item_id: int = db.Column(db.Integer, db.ForeignKey('unmatched_item.id'),
@@ -73,7 +75,8 @@ class ParsedMediaItem(db.Model):
             website=self.website,
             widescreen=self.widescreen,
             year=self.year,
-            job_id=self.job_id)
+            job_id=self.job_id,
+            ignored=self.ignored)
 
     def already_matched(self):
         return ParsedMediaItem.query.filter(and_(

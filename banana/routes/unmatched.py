@@ -8,6 +8,9 @@ from banana.media.item import ParsedMediaItem
 from banana.media.model import UnmatchedItem
 import json
 
+from funcy import some
+from whatever import _
+
 items_per_page = 10
 
 
@@ -22,25 +25,45 @@ def media_searchbla():
     return json.dumps({'total_results': total_results, 'results': media}, cls=_DateAwareJsonEncoder)
 
 
+def _order_by_builder(order_by, order_direction):
+    _mapping = {
+        'created_datetime': {
+            'desc': ParsedMediaItem.created_datetime.desc(),
+            'asc': ParsedMediaItem.created_datetime.asc()
+        },
+        'filename': {
+            'desc': ParsedMediaItem.filename.desc(),
+            'asc': ParsedMediaItem.filename.asc()
+        }
+    }
+    return _mapping[order_by][order_direction]
+
+
 @app.route("/api/unmatched", methods=["GET"])
 def list_unmatched():
-    page = request.args.get("page")
-    if not page:
-        total = UnmatchedItem.query.count()
-        items = UnmatchedItem.query.options(joinedload('*')).all()
-        return json.dumps({"total_items": total,
-                           "pages": banana.common.total_pages(len(items), items_per_page),
-                           "items": items}, cls=_DateAwareJsonEncoder)
-    else:
-        try:
-            int_page = int(page)
-        except ValueError:
-            raise ValueError("Invalid value for 'page' query parameter: {}. Should be an integer value.".format(page))
+    page = request.args.get("page", 200)
+    order_by = request.args.get("order_by")
+    order_direction = request.args.get("order_direction")
+    include_ignored = some(_ == 'include_ignored', request.args)
 
-        results = UnmatchedItem.query.options(joinedload("*")).paginate(int_page, items_per_page, False)
-        return json.dumps(
-            {"total_items": results.total, "pages": banana.common.total_pages(results.total, items_per_page),
-             "items": results.items}, cls=_DateAwareJsonEncoder)
+    try:
+        int_page = int(page)
+    except ValueError:
+        raise ValueError("Invalid value for 'page' query parameter: {}. Should be an integer value.".format(page))
+
+    query = UnmatchedItem.query.options(joinedload("*")).join(ParsedMediaItem)
+
+    if order_by is not None and order_direction is not None:
+        order_clause = _order_by_builder(order_by, order_direction)
+        query = query.order_by(order_clause)
+
+    if not include_ignored:
+        query = query.filter(ParsedMediaItem.ignored.isnot(True))
+
+    results = query.paginate(int_page, items_per_page, False)
+    return json.dumps(
+        {"total_items": results.total, "pages": banana.common.total_pages(results.total, items_per_page),
+         "items": results.items}, cls=_DateAwareJsonEncoder)
 
 
 @app.route("/api/unmatched/count")
