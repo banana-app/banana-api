@@ -58,7 +58,7 @@ class MediaScannerEventObserversTest(unittest.TestCase):
         sock = MockWebSocket()
         sock.emit = MagicMock()
 
-        event = JobErrorEvent(job_id=self.job_context.id(), job_type=self.job_context.type(), cause="some error").to_json()
+        event = JobErrorEvent(job_id=self.job_context.id(), job_type=self.job_context.type(), context="some error").to_json()
 
         scanner_observer.subscribe(MediaScannerCompletedOrErrorEventObserver(self.job_context, sock))
         sock.emit.assert_called_once_with(self.job_context.type(), event, namespace=JOB_NAMESPACE)

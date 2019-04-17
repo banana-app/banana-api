@@ -4,10 +4,10 @@ import rx
 
 from enum import Enum
 
-from banana.media.observables.fixmatch import FixMatchObservable
-from banana.media.observables.manualmatchig import ManualMatchingObservable
-from banana.media.targets import get_media_target_resolver, MediaTargetResolver
-from banana.movies.model import MovieMatchRequest
+from ..media.observables.fixmatch import FixMatchObservable
+from ..media.observables.manualmatchig import ManualMatchingObservable
+from ..media.targets import get_media_target_resolver, MediaTargetResolver
+from ..movies.model import MovieMatchRequest
 from .observers import MediaScannerProgressEventObserver, MediaScannerCompletedOrErrorEventObserver, \
     MediaItemMatchingObserver, \
     ManualMediaItemMatchingObserver, ManualMatchProgressEventObserver, ManualMatchCompletedOrErrorEventObserver, \

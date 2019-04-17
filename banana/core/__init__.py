@@ -2,14 +2,27 @@ import logging
 import logging.config
 import os.path
 
+import dacite
 from flask import Flask
+from flask.json import JSONEncoder
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 
 from .jobs import *
 
 
+class BananaJSONEncoder(JSONEncoder):
+
+    def default(self, o):
+
+        if hasattr(o, 'schema'):
+            return o.schema().dump(o)
+        else:
+            return JSONEncoder.default(self, o)
+
+
 app = Flask(__name__)
+app.json_encoder = BananaJSONEncoder
 
 config = os.path.abspath(
     os.path.join(app.root_path, '..', '..', 'config', os.environ.get('FLASK_ENV', 'development').lower() + ".json"))
@@ -73,3 +86,24 @@ def getLogger(name):
     :return: logger
     """
     return logging.getLogger(name)
+
+
+class JsonMixin:
+    """
+    A JSON serialization and deserialization mixin for classes. It assumes that supporting class
+    has already defined a class method 'def schema() -> Schema` returning marshmallow schema, which is
+    then used for serialization/deserialization.
+    """
+
+    def to_json(self):
+        return self.__class__.schema().dumps(self)
+
+    @classmethod
+    def from_json(cls, serialized, many=False):
+        if many:
+            items = cls.schema().loads(serialized, many=True)
+            return [dacite.from_dict(data_class=cls, data=a, config=dacite.Config(check_types=False)) for a in items]
+        else:
+            return dacite.from_dict(data_class=cls,
+                                    data=cls.schema().loads(serialized),
+                                    config=dacite.Config(check_types=False))

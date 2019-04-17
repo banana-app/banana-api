@@ -1,16 +1,57 @@
-import datetime
 import os
 from dataclasses import dataclass
+from datetime import datetime
 
+import dacite
+from marshmallow import Schema, fields, EXCLUDE
+from mashumaro import DataClassDictMixin
 from sqlalchemy import and_
 
-from banana.common.json import json_serializable
-from banana.core import db
+from banana.core import db, JsonMixin
 
 
-@json_serializable
+class ParsedMediaItemSchema(Schema):
+
+    id: int = fields.Int(required=True)
+    filename: str = fields.String(missing=None)
+    target_filename: str = fields.String(missing=None)
+    path: str = fields.String(missing=None)
+    target_path: str = fields.String(missing=None)
+    audio: str = fields.String(missing=None)
+    codec: str = fields.String(missing=None)
+    container: str = fields.String(missing=None)
+    episode: str = fields.String(missing=None)
+    episodeName: str = fields.String(missing=None)
+    garbage: str = fields.String(missing=None)
+    group: str = fields.String(missing=None)
+    hardcoded: str = fields.String(missing=None)
+    language: str = fields.String(missing=None)
+    proper: str = fields.String(missing=None)
+    quality: str = fields.String(missing=None)
+    region: str = fields.String(missing=None)
+    repack: str = fields.String(missing=None)
+    resolution: str = fields.String(missing=None)
+    season: str = fields.String(missing=None)
+    title: str = fields.String(missing=None)
+    website: str = fields.String(missing=None)
+    widescreen: str = fields.String(missing=None)
+    year: str = fields.String(missing=None)
+
+    job_id: str = fields.String(missing=None)
+    ignored: bool = fields.Boolean(missing=None)
+
+    created_datetime: datetime = fields.DateTime(missing=None)
+
+    unmatched_item_id: int = fields.Integer(missing=None)
+
+    # reference to matched movie, if this media is already matched to a movie
+    matched_movie_id: int = fields.Integer(missing=None)
+
+    class Meta:
+        unknown = EXCLUDE
+
 @dataclass
-class ParsedMediaItem(db.Model):
+class ParsedMediaItem(db.Model, JsonMixin):
     id: int = db.Column(db.Integer, primary_key=True)
     filename: str = db.Column(db.String)
     target_filename: str = db.Column(db.String)
@@ -38,7 +79,7 @@ class ParsedMediaItem(db.Model):
     job_id: str = db.Column(db.String)
     ignored: bool = db.Column(db.Boolean)
 
-    created_datetime: datetime = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    created_datetime: datetime = db.Column(db.DateTime, default=datetime.utcnow)
 
     unmatched_item_id: int = db.Column(db.Integer, db.ForeignKey('unmatched_item.id'),
                                            nullable=True)
@@ -116,3 +157,7 @@ class ParsedMediaItem(db.Model):
         """
         self.target_filename = os.path.basename(target_name)
         self.target_path = os.path.dirname(target_name)
+
+    @classmethod
+    def schema(cls) -> Schema:
+        return ParsedMediaItemSchema()

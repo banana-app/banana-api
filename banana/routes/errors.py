@@ -1,13 +1,21 @@
-from ..core import app, getLogger
-from flask import jsonify
 import traceback
-import sys
+
+from flask import jsonify
+from werkzeug.exceptions import HTTPException, BadRequest
+from marshmallow.validate import ValidationError
+
+from ..core import app, getLogger
 
 logger = getLogger(__name__)
 
 
 @app.errorhandler(Exception)
 def error(exception):
-    logger.error("Uncaught exception: {}".format(exception))
-    traceback.print_exc(file=sys.stdout)
-    return jsonify({"error": {"message": str(exception)}}), 500
+    code = 500
+    if isinstance(exception, HTTPException):
+        code = exception.code
+    elif isinstance(exception, ValidationError):
+        code = BadRequest.code
+    else:
+        logger.error(f'Uncaught application exception: {traceback.format_exc()}. Returning Internal Server Error.')
+    return jsonify(error={'message': str(exception)}), code

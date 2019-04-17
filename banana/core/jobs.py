@@ -1,7 +1,7 @@
+import multiprocessing as mp
 from abc import ABC, abstractmethod
 
-from rx.concurrency import ThreadPoolScheduler, AsyncIOScheduler, GEventScheduler
-import multiprocessing as mp
+from rx.concurrency import ThreadPoolScheduler, GEventScheduler
 
 
 class Runnable(ABC):

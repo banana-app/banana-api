@@ -205,15 +205,16 @@ def _top5_matches(parsed_media_item, match_source):
     :param match_source: a source to match against (IMDB, TMDB)
     :return: an array of MovieMatchCandidates
     """
-    logger.info("Matching {}".format(parsed_media_item))
+    logger.info(f'Matching {parsed_media_item}...')
 
     match_candidates = []
 
+    # noinspection PyBroadException
     try:
         match_candidates = match_source.match(title=parsed_media_item.title)
     except BaseException:
-        logger.warn(f"Exception caught while matching {parsed_media_item} with the source: {traceback.format_exc()}. "
-                    f"Skipped for this source.")
+        logger.warn(f"Exception caught while matching {parsed_media_item} with source: {traceback.format_exc()}. "
+                    f"Media match skipped for this source.")
 
     canonical_title = canonical_movie_title(parsed_media_item.title, parsed_media_item.year).lower()
 
@@ -224,7 +225,7 @@ def _top5_matches(parsed_media_item, match_source):
 
         match_ratio = fuzz.ratio(canonical_title.lower(), m.canonical_title().lower())
         candidate_year = m.release_year
-        logger.debug("Matched {} against {} with ratio: {}".format(canonical_title, m, match_ratio))
+        logger.debug(f'Matched {canonical_title} against {m} with ratio: {match_ratio}')
 
         # if match ratio is not perfect still try to match against original title, if present
         # and if it's different from regular title
@@ -238,7 +239,7 @@ def _top5_matches(parsed_media_item, match_source):
         # for foreign movies
         if match_ratio < 100 and m.akas:
             akas = m.akas
-            logger.debug("Querying for AKAs for {}, got {}".format(canonical_title, akas))
+            logger.debug(f'Querying for AKAs for {canonical_title}, got {akas}')
             for aka in akas:
                 canonical_aka = canonical_movie_title(aka, candidate_year).lower()
                 original_title_match = fuzz.ratio(canonical_title, canonical_aka)
@@ -250,7 +251,7 @@ def _top5_matches(parsed_media_item, match_source):
         results.append(m)
 
     if len(results) < 1:
-        logger.info("No matching movies found for {}".format(canonical_title))
+        logger.info(f'No matching movies found for {canonical_title}.')
         return results
 
     # Sort all entries by match from best match to the worst and get top 5
@@ -261,6 +262,6 @@ def _top5_matches(parsed_media_item, match_source):
 
     top5_movies = sorted(top5_movies_with_boost, key=lambda m: m.match, reverse=True)[:5]
 
-    logger.debug("Top 5 matches for {} : {}".format(canonical_title, top5_movies))
+    logger.debug(f'Top 5 matches for {canonical_title} : {top5_movies}')
 
     return top5_movies

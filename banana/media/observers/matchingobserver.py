@@ -126,7 +126,7 @@ class ManualMediaItemMatchingObserver(EmitEventMixin, rx.Observer):
 
             self.emit(self._web_socket, JobErrorEvent(job_id=self._job_context.id(),
                                                       job_type=self._job_context.type(),
-                                                      cause=str(e)))
+                                                      context=str(e)))
             raise e
 
     def on_completed(self):

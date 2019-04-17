@@ -1,18 +1,29 @@
-import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List
 
-from ..media.item import ParsedMediaItem
-from ..core import db, getLogger
+from marshmallow import Schema, fields, EXCLUDE
+
 from ..common.common import canonical_movie_title
-from ..common.json import json_serializable
+from ..core import db, getLogger, JsonMixin
+from ..media.item import ParsedMediaItem, ParsedMediaItemSchema
 
 logger = getLogger(__name__)
 
 
-@json_serializable
+class MovieMatchRequestSchema(Schema):
+
+    unmatched_item_id = fields.Integer()
+    # local|tmdb|imdb|cutom
+    match_type = fields.String()
+    match_type_id = fields.String()
+
+    custom_name = fields.String()
+    custom_year = fields.String()
+
+
 @dataclass
-class MovieMatchRequest(object):
+class MovieMatchRequest(JsonMixin):
     """
     Movie match request. A python representation of match request from UI, for a given movie candidate.
 
@@ -30,10 +41,29 @@ class MovieMatchRequest(object):
     custom_name: str = None
     custom_year: str = None
 
+    @classmethod
+    def schema(cls) -> Schema:
+        return MovieMatchRequestSchema()
 
-@json_serializable
+
+class GenreSchema(Schema):
+
+    id: int = fields.Integer(missing=None)
+    name: str = fields.String(missing=None)
+    genre_id: int = fields.String(missing=None)
+
+    movie_match_candidate_id: int = fields.Integer(missing=None)
+    movie_id: int = fields.String(missing=None)
+
+    movie = fields.Inferred()
+    movie_match_candidate = fields.Inferred()
+
+    class Meta:
+        exclude = ('movie_match_candidate', 'movie')
+
+
 @dataclass
-class Genre(db.Model):
+class Genre(db.Model, JsonMixin):
     """
     Genre model. Name is requires, genre_id is optional.
     """
@@ -51,10 +81,38 @@ class Genre(db.Model):
         return Genre(name=self.name,
                      genre_id=self.genre_id)
 
+    @classmethod
+    def schema(cls) -> Schema:
+        return GenreSchema()
 
-@json_serializable
+
+class MovieMatchCandidateSchema(Schema):
+
+    id: int = fields.Integer(missing=None)
+
+    title: str = fields.String(missing=None)
+    original_title: str = fields.String(missing=None)
+    release_year: int = fields.Integer(missing=None)
+    plot: str = fields.String(missing=None)
+
+    match: int = fields.Integer(missing=None)
+
+    # metadata
+    external_id: str = fields.String(missing=None)
+    source: str = fields.String(missing=None)
+    rating: str = fields.String(missing=None)
+    poster: str = fields.String(missing=None)
+
+    genres: List[Genre] = fields.Nested(nested=GenreSchema, missing=None, many=True)
+
+    unmatched_item_id: int = fields.Integer(missing=None)
+
+    class Meta:
+        unknown = EXCLUDE
+
+
 @dataclass
-class MovieMatchCandidate(db.Model):
+class MovieMatchCandidate(db.Model, JsonMixin):
     """
     Movie match candidate represents a match candidate for a given movie. This generally represents subset
     of common movie attributes for all sources: tmdb, imdb. Note howeer, that for some movies, only basic information
@@ -71,7 +129,7 @@ class MovieMatchCandidate(db.Model):
     match: int = db.Column(db.Integer)
 
     # metadata
-    external_id: int = db.Column(db.String)
+    external_id: str = db.Column(db.String)
     source: str = db.Column(db.String)
     rating: str = db.Column(db.String)
     poster: str = db.Column(db.String)
@@ -100,10 +158,33 @@ class MovieMatchCandidate(db.Model):
                      genres=self.genres,
                      source=self.source)
 
+    @classmethod
+    def schema(cls) -> Schema:
+        return MovieMatchCandidateSchema()
 
-@json_serializable
+
+class MovieSchema(Schema):
+
+    id: int = fields.Integer(missing=None)
+
+    title: str = fields.String(missing=None)
+    original_title: str = fields.String(missing=None)
+    release_year: int = fields.Integer(missing=None)
+    plot: str = fields.String(missing=None)
+
+    # metadata
+    external_id: str = fields.String(missing=None)
+    source: str = fields.String(missing=None)
+    rating: str = fields.String(missing=None)
+    poster: str = fields.String(missing=None)
+    created_datetime: datetime = fields.DateTime(missing=None)
+
+    genres: List[Genre] = fields.Nested(GenreSchema, many=True, missing=None)
+    media_items: List[ParsedMediaItem] = fields.Nested(ParsedMediaItemSchema, many=True, missing=None)
+
+
 @dataclass
-class Movie(db.Model):
+class Movie(db.Model, JsonMixin):
     id: int = db.Column(db.Integer, primary_key=True)
 
     title: str = db.Column(db.String)
@@ -112,11 +193,11 @@ class Movie(db.Model):
     plot: str = db.Column(db.String)
 
     # metadata
-    external_id: int = db.Column(db.String)
+    external_id: str = db.Column(db.String)
     source: str = db.Column(db.String)
     rating: str = db.Column(db.String)
     poster: str = db.Column(db.String)
-    created_datetime: datetime = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    created_datetime: datetime = db.Column(db.DateTime, default=datetime.utcnow)
 
     genres: List[Genre] = db.relationship('Genre', cascade="all", backref="movie", lazy=True)
     media_items: List[ParsedMediaItem] = db.relationship("ParsedMediaItem", cascade="all", backref="matched_movie",
@@ -139,3 +220,7 @@ class Movie(db.Model):
     @staticmethod
     def from_match(movie_match_candidate):
         return movie_match_candidate.to_movie()
+
+    @classmethod
+    def schema(cls) -> Schema:
+        return MovieSchema()

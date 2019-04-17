@@ -22,6 +22,9 @@ class MediaTargetsTest(unittest.TestCase):
             def already_exist(self):
                 pass
 
+            def do_relink(self, from_path: str):
+                pass
+
         media_target = MockMediaTarget()
         media_target.already_exist = MagicMock(return_value=True)
 

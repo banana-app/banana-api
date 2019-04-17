@@ -40,17 +40,17 @@ class MediaScannerCompletedOrErrorEventObserver(EmitEventMixin, rx.Observer):
                       )
 
         except BaseException as e:
-            self.logger.warning("Exception caught while emitting JobCompletedEvent: {}".format(e))
+            self.logger.warning(f"Exception caught while emitting JobCompletedEvent: {e}")
 
     def on_error(self, error):
         try:
             self.emit(self._socket,
                       JobErrorEvent(job_id=self._job_context.id(),
                                     job_type=self._job_context.type(),
-                                    cause=error)
+                                    context=error)
                       )
         except BaseException as e:
-            self.logger.warning("Exception caught while emitting JobErrorEvent: {}".format(e))
+            self.logger.warning(f"Exception caught while emitting JobErrorEvent: {e}")
 
 
 # noinspection PyBroadException

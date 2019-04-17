@@ -73,7 +73,6 @@ class ScannerTest(unittest.TestCase):
 
         self.assertIsNotNone(filetype.video(os.path.join(self.temp_dir, self._files[1])))
 
-
     def test_threadpool_executor(self):
 
         with open(os.path.join(self.temp_dir, self._files[1]), 'wb') as qoox:
@@ -93,7 +92,7 @@ class ScannerTest(unittest.TestCase):
         scanner_observer.subscribe_on(ThreadPoolScheduler(3)).observe_on(ThreadPoolScheduler(3)).subscribe(
             subject
         )
-        time.sleep(5)
+        time.sleep(1)
 
         self.assertEqual(1, len(processed_items))
         self.assertTrue(one(_.filename == 'B Quux 720p.mkv', processed_items))

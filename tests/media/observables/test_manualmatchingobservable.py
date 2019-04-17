@@ -1,15 +1,16 @@
 import unittest
 from unittest.mock import MagicMock
+
 import rx
 
-from banana.core import db, app
+from banana.core import app
+from banana.media.item import *
+from banana.media.model import *
 from banana.media.observables.manualmatchig import ManualMatchingObservable
 from banana.media.observers import ManualMediaItemMatchingObserver, JobErrorEvent, JOB_NAMESPACE
 from banana.media.sources import LocalSource
 from banana.media.targets import SkipExistingMediaTargetResolver, NoOpMediaTargetBuilder
 from banana.movies.model import *
-from banana.media.model import *
-from banana.media.item import *
 from tests.fixtures import MockJobContext, MockWebSocket
 
 
@@ -74,9 +75,9 @@ class ManualMatchingObservableTest(unittest.TestCase):
         # We have Unmatched Item in db, with media and one candidate
         # and INVALID match request
         context = MockJobContext()
-        media = ParsedMediaItem(filename='Monthy Python 1969.mp4', title='Monthy Python', year='1969')
-        candidate = MovieMatchCandidate(title='Monthy Python', release_year=1969)
-        unmatched = UnmatchedItem(potential_matches=[candidate], parsed_media_item=media,
+        media = ParsedMediaItem(id=1, filename='Monthy Python 1969.mp4', title='Monthy Python', year='1969')
+        candidate = MovieMatchCandidate(id=7, title='Monthy Python', release_year=1969)
+        unmatched = UnmatchedItem(id=3, potential_matches=[candidate], parsed_media_item=media,
                                   non_match_reason=NonMatchReason.LOW_TRESHOLD)
 
         db.session.add(unmatched)
@@ -146,7 +147,7 @@ class ManualMatchingObservableTest(unittest.TestCase):
         # Observer should emit JobErrorEvent using web socket
         self.assertEqual(1, UnmatchedItem.query.count())
         self.assertEqual(0, Movie.query.count())
-        event = JobErrorEvent(job_id=context.id(), job_type=context.type(), cause="Some Exception")
+        event = JobErrorEvent(job_id=context.id(), job_type=context.type(), context="Some Exception")
         socket.emit.assert_called_with(context.type(), event.to_json(), namespace=JOB_NAMESPACE)
 
 
