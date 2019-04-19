@@ -1,19 +1,20 @@
 import uuid
+from abc import abstractmethod
+from enum import Enum
 
 import rx
 
-from enum import Enum
-
-from ..media.observables.fixmatch import FixMatchObservable
-from ..media.observables.manualmatchig import ManualMatchingObservable
-from ..media.targets import get_media_target_resolver, MediaTargetResolver
-from ..movies.model import MovieMatchRequest
+from ..media.observables.mediascanner import FileSystemMediaScanner
 from .observers import MediaScannerProgressEventObserver, MediaScannerCompletedOrErrorEventObserver, \
     MediaItemMatchingObserver, \
     ManualMediaItemMatchingObserver, ManualMatchProgressEventObserver, ManualMatchCompletedOrErrorEventObserver, \
-    FixMatchObserver, FixMatchProgressEventObserver, FixMatchCompletedOrErrorEventObserver
-from banana.media.observables.mediascanner import FileSystemMediaScanner
-from ..core import JobContext, Runnable, Config
+    FixMatchObserver, FixMatchProgressEventObserver, FixMatchCompletedOrErrorEventObserver, ParsedMediaItem, \
+    EmitEventMixin, JobProgressEvent, JobCompletedEvent
+from ..core import JobContext, Runnable, Config, socket as web_socket
+from ..media.observables.fixmatch import FixMatchObservable
+from ..media.observables.manualmatchig import ManualMatchingObservable
+from ..media.targets import get_media_target_resolver, MediaTargetResolver
+from ..movies.model import MovieMatchCandidate
 
 
 class JobTypes(Enum):
@@ -21,6 +22,7 @@ class JobTypes(Enum):
     MEDIA_SCANNER = 'media_scanner'
     MANUAL_MATCH = 'manual_match'
     FIX_MATCH = 'fix_match'
+    GENERIC = 'generic'
 
 
 class FileSystemScanJob(JobContext, Runnable):
@@ -51,13 +53,13 @@ class FileSystemScanJob(JobContext, Runnable):
 
 class ManualMovieMatchJob(JobContext, Runnable):
 
-    def __init__(self, match_request: MovieMatchRequest,
-                 resolver: MediaTargetResolver = get_media_target_resolver(Config.media_target_resolver())
-                 ):
+    def __init__(self,
+                 media: ParsedMediaItem,
+                 candidate: MovieMatchCandidate):
         self._id: str = str(uuid.uuid4())
         self._type: str = JobTypes.MANUAL_MATCH.value
-        self._match_request = match_request
-        self._resolver = resolver
+        self._media = media
+        self._candidate = candidate
 
     def id(self):
         return self._id
@@ -66,7 +68,7 @@ class ManualMovieMatchJob(JobContext, Runnable):
         return self._type
 
     def run(self, scheduler):
-        manual_matcher = rx.Observable.create(ManualMatchingObservable(self, self._match_request))
+        manual_matcher = rx.Observable.create(ManualMatchingObservable(self, self._media, self._candidate))
         subject = rx.subjects.Subject()
         subject.subscribe(ManualMatchProgressEventObserver(self))
         subject.subscribe(ManualMediaItemMatchingObserver(self))
@@ -77,14 +79,14 @@ class ManualMovieMatchJob(JobContext, Runnable):
 class FixMatchJob(JobContext, Runnable):
 
     def __init__(self,
-                 media_id: int,
-                 match_request: MovieMatchRequest,
+                 media: ParsedMediaItem,
+                 candidate: MovieMatchCandidate,
                  resolver: MediaTargetResolver = get_media_target_resolver(Config.media_target_resolver())
                  ):
         self._id: str = str(uuid.uuid4())
-        self._media_id = media_id
+        self._media = media
         self._type: str = JobTypes.FIX_MATCH.value
-        self._match_request = match_request
+        self._candidate = candidate
         self._resolver = resolver
 
     def id(self):
@@ -95,10 +97,44 @@ class FixMatchJob(JobContext, Runnable):
 
     def run(self, scheduler):
         manual_matcher = rx.Observable.create(FixMatchObservable(self,
-                                                                 match_request=self._match_request,
-                                                                 media_id=self._media_id))
+                                                                 media=self._media,
+                                                                 candidate=self._candidate))
         subject = rx.subjects.Subject()
         subject.subscribe(FixMatchProgressEventObserver(self))
         subject.subscribe(FixMatchObserver(self))
         subject.subscribe(FixMatchCompletedOrErrorEventObserver(self))
         manual_matcher.subscribe_on(scheduler).subscribe(subject)
+
+
+class GenericSyncJob(JobContext, Runnable, EmitEventMixin):
+
+    def __init__(self, socket = web_socket):
+        super(GenericSyncJob, self).__init__()
+        self._id = str(uuid.uuid4())
+        self._type = JobTypes.GENERIC.value
+        self._socket = web_socket
+
+    def id(self) -> str:
+        return self._id
+
+    def type(self):
+        return self._type
+
+    @abstractmethod
+    def operation(self):
+        raise NotImplementedError('Operation should be patched before call.')
+
+    @classmethod
+    def from_callable(cls, op):
+        class _GenericSyncJob(cls):
+
+            def operation(self):
+                op()
+
+        return _GenericSyncJob()
+
+    def run(self, scheduler):
+        self.emit(self._socket, JobProgressEvent(self.id(), self.type()))
+        self.operation()
+        self.emit(self._socket, JobCompletedEvent(self.id(), self.type()))
+

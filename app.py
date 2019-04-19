@@ -7,10 +7,11 @@ from banana.routes.movies import *
 from banana.routes.unmatched import *
 from banana.routes.media import *
 from banana.routes.sources import *
+from banana.routes.matches import *
 
 from banana.core import app, db, socket, getLogger
 
-from banana.core.jobs import ThreadPoolJobExecutor, AsyncIOJobExecutor
+from banana.core.jobs import ThreadPoolJobExecutor
 from banana.media.jobs import FileSystemScanJob, JobTypes
 
 logger = getLogger(__name__)

@@ -6,48 +6,12 @@ from marshmallow import Schema, fields, EXCLUDE
 
 from ..common.common import canonical_movie_title
 from ..core import db, getLogger, JsonMixin
-from ..media.item import ParsedMediaItem, ParsedMediaItemSchema
+import banana.media
 
 logger = getLogger(__name__)
 
 
-class MovieMatchRequestSchema(Schema):
-
-    unmatched_item_id = fields.Integer()
-    # local|tmdb|imdb|cutom
-    match_type = fields.String()
-    match_type_id = fields.String()
-
-    custom_name = fields.String()
-    custom_year = fields.String()
-
-
-@dataclass
-class MovieMatchRequest(JsonMixin):
-    """
-    Movie match request. A python representation of match request from UI, for a given movie candidate.
-
-    Supported match types:
-    * imdb - match based on IMDB id; match_type_id is IMDB id in this case
-    * tmdb - match based on TMDB id; match_type_id is TMDB id in this case
-    * local - match against pre-exsiting match candidates, match_type_id is local MovieMatchCandidate id
-    * custom - custom match - cutom_name and custom_year is required
-    """
-    unmatched_item_id: int = None
-    # local|tmdb|imdb|cutom
-    match_type: str = None
-    match_type_id: str = None
-
-    custom_name: str = None
-    custom_year: str = None
-
-    @classmethod
-    def schema(cls) -> Schema:
-        return MovieMatchRequestSchema()
-
-
 class GenreSchema(Schema):
-
     id: int = fields.Integer(missing=None)
     name: str = fields.String(missing=None)
     genre_id: int = fields.String(missing=None)
@@ -87,7 +51,6 @@ class Genre(db.Model, JsonMixin):
 
 
 class MovieMatchCandidateSchema(Schema):
-
     id: int = fields.Integer(missing=None)
 
     title: str = fields.String(missing=None)
@@ -158,13 +121,25 @@ class MovieMatchCandidate(db.Model, JsonMixin):
                      genres=self.genres,
                      source=self.source)
 
+    def transient_copy(self):
+        return MovieMatchCandidate(
+            title=self.title,
+            original_title=self.original_title,
+            release_year=self.release_year,
+            plot=self.plot,
+            match=self.match,
+            external_id=self.external_id,
+            source=self.source,
+            rating=self.rating,
+            poster=self.poster,
+            genres=[g.transient_copy() for g in self.genres])
+
     @classmethod
     def schema(cls) -> Schema:
         return MovieMatchCandidateSchema()
 
 
 class MovieSchema(Schema):
-
     id: int = fields.Integer(missing=None)
 
     title: str = fields.String(missing=None)
@@ -180,7 +155,8 @@ class MovieSchema(Schema):
     created_datetime: datetime = fields.DateTime(missing=None)
 
     genres: List[Genre] = fields.Nested(GenreSchema, many=True, missing=None)
-    media_items: List[ParsedMediaItem] = fields.Nested(ParsedMediaItemSchema, many=True, missing=None)
+    media_items: List['banana.media.item.ParsedMediaItem'] = fields.Nested('banana.media.item.ParsedMediaItemSchema',
+                                                                           many=True, missing=None)
 
 
 @dataclass
@@ -200,8 +176,9 @@ class Movie(db.Model, JsonMixin):
     created_datetime: datetime = db.Column(db.DateTime, default=datetime.utcnow)
 
     genres: List[Genre] = db.relationship('Genre', cascade="all", backref="movie", lazy=True)
-    media_items: List[ParsedMediaItem] = db.relationship("ParsedMediaItem", cascade="all", backref="matched_movie",
-                                                                           lazy=True)
+    media_items: List['banana.media.item.ParsedMediaItem'] = db.relationship('banana.media.item.ParsedMediaItem',
+                                                                             cascade="all", backref="matched_movie",
+                                                                             lazy=True)
 
     def canonical_title(self):
         return canonical_movie_title(self.title, self.release_year)
@@ -224,3 +201,20 @@ class Movie(db.Model, JsonMixin):
     @classmethod
     def schema(cls) -> Schema:
         return MovieSchema()
+
+
+class MovieMatchRequestSchema(Schema):
+
+    candidate = fields.Nested(MovieMatchCandidateSchema, required=True)
+    media = fields.Nested('banana.media.item.ParsedMediaItemSchema', required=True)
+
+
+@dataclass
+class MovieMatchRequest(JsonMixin):
+
+    candidate: MovieMatchCandidate
+    media: 'banana.media.item.ParsedMediaItem'
+
+    @classmethod
+    def schema(cls):
+        return MovieMatchRequestSchema()

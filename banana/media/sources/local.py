@@ -2,8 +2,6 @@ from sqlalchemy import or_
 
 from banana.media.item import ParsedMediaItem
 from banana.media.model import MovieMatchCandidate
-from typing import Tuple, List
-
 from banana.movies.model import Movie
 
 

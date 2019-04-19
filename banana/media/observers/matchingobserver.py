@@ -68,11 +68,10 @@ class MediaItemMatchingObserver(rx.Observer):
                             target=target)
 
             else:
-                ui = UnmatchedItem(parsed_media_item=media,
-                                   potential_matches=match_result.potential_matches(),
-                                   non_match_reason=match_result.reason())
+                media.unmatched = UnmatchedItem(potential_matches=match_result.potential_matches(),
+                                                non_match_reason=match_result.reason())
 
-                db.session.add(ui)
+                db.session.add(media)
 
             db.session.commit()
 
@@ -93,25 +92,25 @@ class ManualMediaItemMatchingObserver(EmitEventMixin, rx.Observer):
     def __init__(self,
                  job_context: JobContext,
                  resolver: MediaTargetResolver = get_media_target_resolver(Config.media_target_resolver()),
-                 web_socket = web_socket):
+                 web_socket=web_socket):
         super().__init__()
         self._job_context = job_context
         self._web_socket = web_socket
         self.resolver = resolver
         self.logger = getLogger(self.__class__.__name__)
 
-    def on_next(self, media_and_movie: Tuple[UnmatchedItem, MovieMatchCandidate]):
+    def on_next(self, media_and_candidate: Tuple[ParsedMediaItem, MovieMatchCandidate]):
         # noinspection PyBroadException
         try:
-            unmatched, candidate = media_and_movie
-            media = unmatched.parsed_media_item.transient_copy()
+            source_media, candidate = media_and_candidate
+            media = source_media.transient_copy()
             media.job_id = self._job_context.id()
-            movie = candidate.to_movie()
+            movie = candidate.transient_copy().to_movie()
             target_media, target = self.resolver.resolve(media=media, movie=movie)
 
             match_movie(media=target_media, movie=movie, target=target)
 
-            db.session.delete(unmatched)
+            ParsedMediaItem.query.filter_by(id=source_media.id).delete()
             db.session.commit()
 
         except BaseException as e:
@@ -141,7 +140,7 @@ class FixMatchObserver(EmitEventMixin, rx.Observer):
     def __init__(self,
                  job_context: JobContext,
                  resolver: MediaTargetResolver = get_media_target_resolver(Config.media_target_resolver()),
-                 web_socket = web_socket):
+                 web_socket=web_socket):
         super().__init__()
         self._job_context = job_context
         self._web_socket = web_socket
@@ -152,8 +151,10 @@ class FixMatchObserver(EmitEventMixin, rx.Observer):
         # noinspection PyBroadException
         try:
             source_media, candidate = media_and_candidate
+
+            source_media = ParsedMediaItem.query.filter_by(id=source_media.id).one_or_none()
             source_media.job_id = self._job_context.id()
-            movie = candidate.to_movie()
+            movie = candidate.transient_copy().to_movie()
             target_media, target = self.resolver.resolve(media=source_media.transient_copy(), movie=movie)
 
             already_existing_movie = Movie.query.filter_by(external_id=movie.external_id).first()
@@ -166,7 +167,7 @@ class FixMatchObserver(EmitEventMixin, rx.Observer):
             target.do_relink(source_media.absolute_target_path())
             source_movie = source_media.matched_movie
 
-            # if we are unlinking the only linke media from movie, we remove whole
+            # if we are unlinking the only linked media from movie, we remove whole
             # movie altogether
             if source_movie and none(_.id != source_media.id, source_movie.media_items):
                 db.session.delete(source_movie)
@@ -175,19 +176,19 @@ class FixMatchObserver(EmitEventMixin, rx.Observer):
             db.session.commit()
 
         except BaseException as e:
-            self.logger.warning("Exception caught while processing media item: {}. Emitting JobErrorEvent and"
-                                " unwinding gracefully. This media item would not be processed."
-                                .format(traceback.format_exc()))
-            db.session.rollback()
+                self.logger.warning("Exception caught while processing media item: {}. Emitting JobErrorEvent and"
+                                    " unwinding gracefully. This media item would not be processed."
+                                    .format(traceback.format_exc()))
+                db.session.rollback()
 
-            # We need to handle this gracefully. Exceptions emitted from Observers means that Observable will
-            # unsubscribe all of them, and in fact this will be rethrown. We want, however to emit proper
-            # event to UI first, the we rethrow to finish job
+                # We need to handle this gracefully. Exceptions emitted from Observers means that Observable will
+                # unsubscribe all of them, and in fact this will be rethrown. We want, however to emit proper
+                # event to UI first, the we rethrow to finish job
 
-            self.emit(self._web_socket, JobErrorEvent(job_id=self._job_context.id(),
-                                                      job_type=self._job_context.type(),
-                                                      context=str(e)))
-            raise e
+                self.emit(self._web_socket, JobErrorEvent(job_id=self._job_context.id(),
+                                                          job_type=self._job_context.type(),
+                                                          context=str(e)))
+                raise e
 
     def on_completed(self):
         pass

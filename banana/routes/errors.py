@@ -9,7 +9,7 @@ from ..core import app, getLogger
 logger = getLogger(__name__)
 
 
-@app.errorhandler(Exception)
+@app.errorhandler(BaseException)
 def error(exception):
     code = 500
     if isinstance(exception, HTTPException):

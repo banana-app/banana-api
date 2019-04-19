@@ -6,7 +6,6 @@ from marshmallow import Schema, fields, EXCLUDE
 from marshmallow_enum import EnumField
 
 from ..core import db, JsonMixin
-from ..media.item import ParsedMediaItem, ParsedMediaItemSchema
 from ..movies.matchdecider import NonMatchReason
 from ..movies.model import MovieMatchCandidate, MovieMatchCandidateSchema
 
@@ -15,7 +14,6 @@ class UnmatchedItemSchema(Schema):
 
     id: int = fields.Integer(missing=None)
     potential_matches: List[MovieMatchCandidate] = fields.Nested(nested=MovieMatchCandidateSchema, many=True)
-    parsed_media_item: ParsedMediaItem = fields.Nested(nested=ParsedMediaItemSchema, missing=None)
 
     created_datetime: datetime = fields.DateTime(missing=None)
     non_match_reason: NonMatchReason = EnumField(NonMatchReason)
@@ -35,8 +33,10 @@ class UnmatchedItem(db.Model, JsonMixin):
     potential_matches: List[MovieMatchCandidate] = db.relationship('MovieMatchCandidate', backref='unmatched_item',
                                                                    cascade="all", lazy=True,
                                                                    order_by="desc(MovieMatchCandidate.match)")
-    parsed_media_item: ParsedMediaItem = db.relationship('ParsedMediaItem', backref='unmatched_item',
-                                                         cascade="all", lazy=True, uselist=False)
+
+    parsed_media_id: int = db.Column(db.Integer, db.ForeignKey('parsed_media_item.id'),
+                                       nullable=True)
+
     created_datetime: datetime = db.Column(db.DateTime, default=datetime.utcnow)
     non_match_reason: NonMatchReason = db.Column(db.Enum(NonMatchReason))
 

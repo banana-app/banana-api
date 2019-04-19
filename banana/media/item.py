@@ -2,12 +2,11 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 
-import dacite
 from marshmallow import Schema, fields, EXCLUDE
-from mashumaro import DataClassDictMixin
 from sqlalchemy import and_
 
 from banana.core import db, JsonMixin
+from banana.media.model import UnmatchedItem, UnmatchedItemSchema
 
 
 class ParsedMediaItemSchema(Schema):
@@ -42,13 +41,14 @@ class ParsedMediaItemSchema(Schema):
 
     created_datetime: datetime = fields.DateTime(missing=None)
 
-    unmatched_item_id: int = fields.Integer(missing=None)
+    unmatched = fields.Nested(UnmatchedItemSchema, missing=None)
 
     # reference to matched movie, if this media is already matched to a movie
     matched_movie_id: int = fields.Integer(missing=None)
 
     class Meta:
         unknown = EXCLUDE
+
 
 @dataclass
 class ParsedMediaItem(db.Model, JsonMixin):
@@ -77,12 +77,13 @@ class ParsedMediaItem(db.Model, JsonMixin):
     widescreen: str = db.Column(db.String)
     year: str = db.Column(db.String)
     job_id: str = db.Column(db.String)
-    ignored: bool = db.Column(db.Boolean)
+    ignored: bool = db.Column(db.Boolean, nullable=False, default=False)
 
     created_datetime: datetime = db.Column(db.DateTime, default=datetime.utcnow)
 
-    unmatched_item_id: int = db.Column(db.Integer, db.ForeignKey('unmatched_item.id'),
-                                           nullable=True)
+    unmatched = db.relationship(UnmatchedItem, backref='parsed_media_item',
+                                                         cascade="all", lazy=True, uselist=False)
+
 
     # reference to matched movie, if this media is already matched to a movie
     matched_movie_id: int = db.Column(db.Integer, db.ForeignKey('movie.id'),
@@ -125,6 +126,9 @@ class ParsedMediaItem(db.Model, JsonMixin):
             ParsedMediaItem.path == self.path,
             ParsedMediaItem.matched_movie_id.isnot(None)
         )).one_or_none()
+
+    def already_linked(self):
+        return self.target_path is not None
 
     def absolute_path(self):
         if not self.path or not self.filename:

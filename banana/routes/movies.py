@@ -1,36 +1,18 @@
-from flask import request, jsonify
-from marshmallow import Schema, fields
+from flask import jsonify, request
 from webargs.flaskparser import use_kwargs
 
-from ..core import app, getLogger, ThreadPoolJobExecutor
+from ..core.filtering import PageWithOrderSchema, with_filters, paginated, using_attributes
+from ..core import app, getLogger
 from ..media.item import ParsedMediaItem
-from ..media.jobs import ManualMovieMatchJob
-from ..common.common import total_pages
 from ..media.sources import get_media_source
-from ..movies.model import Movie, MovieMatchRequest
+from ..movies.model import Movie
 
 logger = getLogger(__name__)
 
 DEFAULT_ITEMS_PER_PAGE = 5
 
 
-@app.route("/api/movies", methods=["POST"])
-def movies_match():
-    logger.info(f'Matching request: {request.data}')
-
-    match_request = MovieMatchRequest.from_json(request.data)
-    match_job = ManualMovieMatchJob(match_request=match_request)
-    ThreadPoolJobExecutor().submit(match_job)
-
-    return jsonify(job_id=match_job.id())
-
-
-@app.route("/api/movies/<int:movie_id>", methods=['GET'])
-def get_movies(movie_id):
-    return jsonify(Movie.query.filter_by(id=movie_id).first_or_404())
-
-
-def _order_by_builder(order_by, order_direction):
+def _order_spec(order_by, order_direction):
     _mapping = {
         'created_datetime': {
             'desc': Movie.created_datetime.desc(),
@@ -44,38 +26,29 @@ def _order_by_builder(order_by, order_direction):
     return _mapping[order_by][order_direction]
 
 
-class MoviesArgsSchema(Schema):
-    page = fields.Integer(missing=1)
-    page_size = fields.Integer(missing=DEFAULT_ITEMS_PER_PAGE)
-    order_by = fields.String(missing='created_datetime')
-    order_direction = fields.String(missing='desc')
-    job_id = fields.String(missing=None)
+@app.route("/api/movies/<int:movie_id>", methods=['GET'])
+def movies_get(movie_id):
+    return jsonify(Movie.query.filter_by(id=movie_id).first_or_404())
 
 
 @app.route("/api/movies", methods=["GET"])
-@use_kwargs(MoviesArgsSchema(), locations=('query',))
-def movies(page, page_size, order_by, order_direction, job_id):
+@use_kwargs(PageWithOrderSchema.with_page_size(5), locations=('query',))
+def movies_list(page, page_size, order_by, order_direction):
 
-    query = Movie.query
+    query = Movie.query.join(ParsedMediaItem).with_filters(request.query_string, using_attributes(
+        job_id=ParsedMediaItem.job_id,
+        title=ParsedMediaItem.title,
+    )).order_by(_order_spec(order_by, order_direction))
 
-    if order_by is not None and order_direction is not None:
-        order_clause = _order_by_builder(order_by, order_direction)
-        query = query.order_by(order_clause)
-
-    if job_id is not None:
-        query = query.join(ParsedMediaItem).filter(ParsedMediaItem.job_id == job_id)
-
-    results = query.paginate(page, page_size, False)
-
-    return jsonify(total_items=results.total,
-                   pages=total_pages(results.total, page_size),
-                   items=results.items)
+    return jsonify(paginated(query.paginate(page, page_size, False)))
 
 
 @app.route("/api/movies/count", methods=['GET'])
 def movies_count():
-    total = Movie.query.count()
-    return jsonify(total_items=total)
+    query = Movie.query.join(ParsedMediaItem).with_filters(request.query_string, using_attributes(
+        job_id=ParsedMediaItem.job_id
+    ))
+    return jsonify(total_items=query.count())
 
 
 @app.route("/api/movies/<int:id>/cast", methods=['GET'])

@@ -12,5 +12,4 @@ logger = getLogger(__name__)
 @use_kwargs({'title': fields.String(required=True)})
 def source_search(source: str, title: str):
     results = get_media_source(source).search(title=title)
-    logger.debug(results)
     return jsonify(results)
