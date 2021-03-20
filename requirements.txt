@@ -14,7 +14,7 @@ python-Levenshtein
 gevent==1.4.0
 gevent-websocket==0.10.1
 IMDbPY==6.6
-Jinja2==2.10
+Jinja2==2.11.3
 jsons==0.8.0
 pathlib2==2.3.3
 regex==2019.3.9
