@@ -1,6 +1,6 @@
 dacite
 marshmallow
-webargs==5.3.0
+webargs==5.5.3
 pysqlite3
 cachetools==3.1.0
 dataclasses-json==0.2.2
